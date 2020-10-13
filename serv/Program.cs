@@ -24,7 +24,8 @@ namespace serv
                 int length = 0;
                 if ((length = client.Socket.Receive(buff)) == 0)
                 {
-                    Console.WriteLine("disconnecting id " + client.ID);
+                    clientsList.Remove(client);
+                    Console.WriteLine("Disconnecting ID " + client.ID);
                     break;
                 }
 
@@ -51,17 +52,40 @@ namespace serv
                     {
                         case "id":
                             sender.ID = Convert.ToInt32(parts[2]);
-                            sender.Socket.Send(Encoding.ASCII.GetBytes("test"));
+                            sender.Socket.Send(Encoding.ASCII.GetBytes("Your ID is " + sender.ID + " now" + '\n'));
                             break;
                     }
                     break;
                 case "lst":
-                    string reply = "";
+                    string reply = "Now connected: ";
                     foreach (Client cli in clientsList)
-                    {
-                        reply += cli.ID + "\n";
-                    }
+                        reply += cli.ID + " ";
+                    reply += '\n';
                     sender.Socket.Send(Encoding.ASCII.GetBytes(reply));
+                    break;
+                case "msg":
+                    if (!int.TryParse(parts[1], out int addressID) || !clientsList.Exists(addressCli => addressCli.ID == addressID))
+                    {
+                        sender.Socket.Send(Encoding.ASCII.GetBytes("Invalid address ID" + "\r\n"));
+                        break;
+                    }
+                    string message = "";
+                    for (int i = 2; i < parts.Length; i++)
+                        message += parts[i] + ' ';
+                    Client addresser = clientsList.Find(client => client.ID == addressID);
+                    addresser.Socket.Send(Encoding.ASCII.GetBytes("msg " + sender.ID + " " + message + "\n"));
+                    break;
+                case "job":
+                    if (!int.TryParse(parts[1], out int addresID) || !clientsList.Exists(addressCli => addressCli.ID == addresID))
+                    {
+                        sender.Socket.Send(Encoding.ASCII.GetBytes("Invalid address ID" + "\n"));
+                        break;
+                    }
+                    Client addreser = clientsList.Find(client => client.ID == addresID);
+                    string mesge = "";
+                    for (int i = 2; i < parts.Length; i++)
+                        mesge += parts[i] + ' ';
+                    addreser.Socket.Send(Encoding.ASCII.GetBytes("job " + sender.ID + " " + mesge + "\n"));
                     break;
             }
         }
@@ -71,13 +95,15 @@ namespace serv
             Socket serverSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             serverSocket.Bind(new IPEndPoint(IPAddress.Any, 7000));
 
-            serverSocket.Listen(5);
+            serverSocket.Listen(15);
 
             while (true)
             {
                 Socket clientSocket = serverSocket.Accept();
                 Client client = new Client(clientSocket);
                 clientsList.Add(client);
+                Console.WriteLine("Connected ID " + client.ID);
+                client.Socket.Send(Encoding.ASCII.GetBytes("Connected. Given ID: " + client.ID + "\n"));
 
                 Thread thread = new Thread(new ParameterizedThreadStart(ClientListen));
                 thread.Start(client);
