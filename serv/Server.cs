@@ -9,9 +9,21 @@ using System.Threading;
 
 namespace serv
 {
-    class Program
+    class Server
     {
+        static int[] PoolID = new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
         static List<Client> clientsList = new List<Client>();
+
+        static int[] GetWorkers()
+        {
+            List<Client> workers = clientsList.FindAll(client => client.ClientType == ClientType.Worker);
+            int[] workersIDs = new int[workers.Count];
+
+            for (int i = 0; i < workers.Count; i++)
+                workersIDs[i] = workers[i].ID;
+
+            return workersIDs;
+        }
 
         static public void ClientListen(Object clnt)
         {
@@ -54,6 +66,27 @@ namespace serv
                             sender.ID = Convert.ToInt32(parts[2]);
                             sender.Socket.Send(Encoding.ASCII.GetBytes("Your ID is " + sender.ID + " now" + '\n'));
                             break;
+                        case "type":
+                            switch (parts[2])
+                            {
+                                case "worker":
+                                    clientsList[clientsList.IndexOf(sender)].ClientType = ClientType.Worker;
+                                    sender.Socket.Send(Encoding.ASCII.GetBytes("Your type is now " + clientsList[clientsList.IndexOf(sender)].ClientType + "\n"));
+                                    break;
+                            }
+                            break;
+                    }
+                    break;
+                case "get":
+                    switch (parts[1])
+                    {
+                        case "workers":
+                            int[] availableWorkers = GetWorkers();
+                            string msg = "Workers ";
+                            foreach (int id in availableWorkers)
+                                msg += id + "|";
+                            sender.Socket.Send(Encoding.ASCII.GetBytes(msg));
+                            break;
                     }
                     break;
                 case "lst":
@@ -73,7 +106,7 @@ namespace serv
                     for (int i = 2; i < parts.Length; i++)
                         message += parts[i] + ' ';
                     Client addresser = clientsList.Find(client => client.ID == addressID);
-                    addresser.Socket.Send(Encoding.ASCII.GetBytes("msg " + sender.ID + " " + message + "\n"));
+                    addresser.Socket.Send(Encoding.ASCII.GetBytes(message + "\n"));
                     break;
                 case "job":
                     if (!int.TryParse(parts[1], out int addresID) || !clientsList.Exists(addressCli => addressCli.ID == addresID))
@@ -101,6 +134,14 @@ namespace serv
             {
                 Socket clientSocket = serverSocket.Accept();
                 Client client = new Client(clientSocket);
+                foreach(int ID in PoolID)
+                {
+                    if(clientsList.Find(cli => cli.ID == ID) == null)
+                    {
+                        client.ID = ID;
+                        break;
+                    }
+                }
                 clientsList.Add(client);
                 Console.WriteLine("Connected ID " + client.ID);
                 client.Socket.Send(Encoding.ASCII.GetBytes("Connected. Given ID: " + client.ID + "\n"));

@@ -11,6 +11,7 @@ namespace ClientWorker
 {
     public class Job
     {
+        public int ID { get; }
         private string data;
         public int x0 = 0;
         public int y0 = 0;
@@ -20,11 +21,12 @@ namespace ClientWorker
         private string result;
         private Socket serverSocket;
 
-        public Job(string data, int giver, Socket giverSocket)
+        public Job(string data, int giver, Socket giverSocket, int jobID)
         {
             this.data = data;
             this.giver = giver;
             this.serverSocket = giverSocket;
+            this.ID = jobID;
         }
 
         public byte[] ReturnResult()
@@ -47,13 +49,15 @@ namespace ClientWorker
         }
     }
 
-    public class Program
+    public class Worker
     {
         public static Socket ServerSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
 
         static List<Job> Jobs = new List<Job>();
 
         public const int MaxJobs = 4;
+
+        private static Random Random = new Random();
 
         public static void Working()
         {
@@ -93,17 +97,20 @@ namespace ClientWorker
             string[] cmdParts = cmd.Split(' ');
             switch (cmdParts[0])
             {
+                case "JobResult":
+                    
+                    break;
                 case "msg":
                     string message = "";
                     for (int i = 2; i < cmdParts.Length; i++)
                         message += cmdParts[i] + ' ';
-                    Console.WriteLine("Message from " + cmdParts[1] + ": "  + message + "\r\n");
+                    //Console.WriteLine("Message from " + cmdParts[1] + ": "  + message + "\r\n");
                     break;
                 case "job":
                     if (Jobs.Count < MaxJobs)
                     {
                         string data = cmdParts[2];
-                        Jobs.Add(new Job(data, Convert.ToInt32(cmdParts[1]), ServerSocket));
+                        Jobs.Add(new Job(data, Convert.ToInt32(cmdParts[1]), ServerSocket, Random.Next(0, 100000)));
                     }
                     break;
             }
@@ -141,6 +148,7 @@ namespace ClientWorker
             ThreadStart Listen = new ThreadStart(ListeningServer);
             Thread StartListening = new Thread(Listen);
             StartListening.Start();
+            ServerSocket.Send(Encoding.ASCII.GetBytes("set type worker\r\n"));
 
             while (true)
             {
