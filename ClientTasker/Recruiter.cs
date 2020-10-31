@@ -5,27 +5,47 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ClientTasker
 {
+    public struct PendingJob
+    {
+        public int WorkerID;
+        public int JobID;
+
+        public PendingJob(int wid, int jid)
+        {
+            WorkerID = wid;
+            JobID = jid;
+        }
+    }
+
     public class Recruiter
     {
         private Socket ServerSocket { get; }
         private EndPoint Server { get; }
         public List<int> WorkersIDs { get; set; } = new List<int>();
+        private Form1 Tasker { get; }
+        private List<PendingJob> PendingJobs { get; set; } = new List<PendingJob>();
+        private Random Random { get; set; } = new Random();
 
-        public Recruiter(EndPoint endpoint)
+        public Recruiter(EndPoint endpoint, Form1 parent)
         {
+            Tasker = parent;
             ServerSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
 
             Server = endpoint;
 
             try
             {
-                ServerSocket.Connect("192.168.0.3", 7000);
+                ServerSocket.Connect("192.168.56.1", 7000);
                 byte[] answer = new byte[1024];
                 int ind = ServerSocket.Receive(answer);
+                ThreadStart Listen = new ThreadStart(ListenServer);
+                Thread listening = new Thread(Listen);
+                listening.Start();
                 string ans = Encoding.ASCII.GetString(answer);
                 RefreshWorkersList();
             }
@@ -35,7 +55,45 @@ namespace ClientTasker
             }
         }
 
-        private void RefreshWorkersList()
+        private void ReceiveJobResult(PendingJob job, int[] resultData)
+        {
+            if (PendingJobs.Contains(job))
+            {
+                PendingJobs.Remove(job);
+                Tasker.CompletedJobs.Add(new Job(job.JobID, resultData));
+            }
+        }
+
+        private void ExecuteCommand(string command)
+        {
+            string[] cmdParts = command.Split(' ');
+
+            switch (cmdParts[0])
+            {
+                case "JobResult":
+                    int jobID = Convert.ToInt32(cmdParts[1]);
+                    int workerID = Convert.ToInt32(cmdParts[2]);
+                    string[] strData = cmdParts[3].Split('|');
+                    int[] intData = new int[strData.Length];
+                    for (int i = 0; i < strData.Length; i++)
+                        intData[i] = Convert.ToInt32(strData[i]);
+                    ReceiveJobResult(new PendingJob(workerID, jobID), intData);
+                    break;
+            }
+        }
+
+        private void ListenServer()
+        {
+            while (true)
+            {
+                byte[] buff = new byte[1024];
+                int ind = ServerSocket.Receive(buff);
+                string cmd = Encoding.ASCII.GetString(buff).Substring(0, ind);
+                ExecuteCommand(cmd);
+            }
+        }
+
+        public void RefreshWorkersList()
         {
             ServerSocket.Send(Encoding.ASCII.GetBytes("get workers\r\n"));
             byte[] answer = new byte[1024];
@@ -51,7 +109,7 @@ namespace ClientTasker
                     if (!WorkersIDs.Contains(availableID))
                         WorkersIDs.Add(availableID);
                 }
-                foreach(int existingID in WorkersIDs)
+                foreach (int existingID in WorkersIDs)
                 {
                     if (!availableIDs.Contains(existingID))
                         WorkersIDs.Remove(existingID);
@@ -59,7 +117,17 @@ namespace ClientTasker
             }
         }
 
-        public int[] GiveJob(int workerID, int[] data)
+        public int ChooseWorker()
+        {
+            return WorkersIDs[0];
+        }
+
+        public void Disconnect()
+        {
+            ServerSocket.Disconnect(false);
+        }
+
+        public void GiveJob(int workerID, int jobID, int[] data)
         {
             string dataString = "";
             for (int i = 0; i < data.Length; i++)
@@ -68,27 +136,11 @@ namespace ClientTasker
                 if (i != data.Length - 1)
                     dataString += '|';
             }
-            string command = "job " + workerID + " " + dataString + "\r\n";
+            string command = "job " + workerID + " " + jobID + " " + dataString + " \r\n";
+            PendingJobs.Add(new PendingJob(workerID, jobID));
 
             ServerSocket.Send(Encoding.ASCII.GetBytes(command));
 
-            byte[] answer = new byte[1024];
-            int ind = ServerSocket.Receive(answer);
-            if (ind > 0)
-            {
-                string[] reply = Encoding.ASCII.GetString(answer).Substring(0, ind).Split(' ');
-                if (reply[0] != "JobResult")
-                    return new int[0];
-                reply = reply[1].Split('|');
-                int[] nums = new int[reply.Length];
-
-                for (int i = 0; i < nums.Length; i++)
-                    nums[i] = Convert.ToInt32(reply[i]);
-
-                return nums;
-            }
-
-            return new int[0];
         }
     }
 }

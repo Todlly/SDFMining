@@ -12,14 +12,14 @@ namespace ClientWorker
     public class Job
     {
         public int ID { get; }
-        private string data;
+        public string data;
         public int x0 = 0;
         public int y0 = 0;
         public bool pending = true;
         public bool busy = false;
-        private int giver;
-        private string result;
-        private Socket serverSocket;
+        public int giver;
+        public string result;
+        public Socket serverSocket;
 
         public Job(string data, int giver, Socket giverSocket, int jobID)
         {
@@ -29,11 +29,7 @@ namespace ClientWorker
             this.ID = jobID;
         }
 
-        public byte[] ReturnResult()
-        {
-            string output = "msg " + giver + " JobResult " + result + "\r\n";
-            return Encoding.ASCII.GetBytes(output);
-        }
+        
 
         public void DoJob()
         {
@@ -55,6 +51,7 @@ namespace ClientWorker
 
         static List<Job> Jobs = new List<Job>();
 
+        public static int WorkID { get; private set; }
         public const int MaxJobs = 4;
 
         private static Random Random = new Random();
@@ -72,7 +69,8 @@ namespace ClientWorker
                         job.pending = false;
                         job.busy = true;
                         job.DoJob();
-                        ServerSocket.Send(job.ReturnResult());
+                        string output = "msg " + job.giver + " JobResult " + job.ID + " " + WorkID + " " + job.result + " \r\n";
+                        ServerSocket.Send(Encoding.ASCII.GetBytes(output));
                         Jobs.Remove(job);
                     }
                 }
@@ -109,9 +107,12 @@ namespace ClientWorker
                 case "job":
                     if (Jobs.Count < MaxJobs)
                     {
-                        string data = cmdParts[2];
-                        Jobs.Add(new Job(data, Convert.ToInt32(cmdParts[1]), ServerSocket, Random.Next(0, 100000)));
+                        string data = cmdParts[3];
+                        Jobs.Add(new Job(data, Convert.ToInt32(cmdParts[1]), ServerSocket, Convert.ToInt32(cmdParts[2])));
                     }
+                    break;
+                case "IDGiven":
+                    WorkID = Convert.ToInt32(cmdParts[1]);
                     break;
             }
         }
@@ -140,7 +141,7 @@ namespace ClientWorker
 
         static void Main(string[] args)
         {
-            ServerSocket.Connect("192.168.23.10", 7000);
+            ServerSocket.Connect("192.168.56.1", 7000);
             ThreadStart Work = new ThreadStart(Working);
             Thread StartWorking = new Thread(Work);
             StartWorking.Start();

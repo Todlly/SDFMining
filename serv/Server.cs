@@ -64,14 +64,14 @@ namespace serv
                     {
                         case "id":
                             sender.ID = Convert.ToInt32(parts[2]);
-                            sender.Socket.Send(Encoding.ASCII.GetBytes("Your ID is " + sender.ID + " now" + '\n'));
+                            sender.Socket.Send(Encoding.ASCII.GetBytes("IDGiven " + sender.ID + " \n"));
                             break;
                         case "type":
                             switch (parts[2])
                             {
                                 case "worker":
                                     clientsList[clientsList.IndexOf(sender)].ClientType = ClientType.Worker;
-                                    sender.Socket.Send(Encoding.ASCII.GetBytes("Your type is now " + clientsList[clientsList.IndexOf(sender)].ClientType + "\n"));
+                                    sender.Socket.Send(Encoding.ASCII.GetBytes("Your Type Is Now " + clientsList[clientsList.IndexOf(sender)].ClientType + "\n"));
                                     break;
                             }
                             break;
@@ -144,7 +144,8 @@ namespace serv
                 }
                 clientsList.Add(client);
                 Console.WriteLine("Connected ID " + client.ID);
-                client.Socket.Send(Encoding.ASCII.GetBytes("Connected. Given ID: " + client.ID + "\n"));
+                //client.Socket.Send(Encoding.ASCII.GetBytes("Connected. Given ID: " + client.ID + "\n"));
+                client.Socket.Send(Encoding.ASCII.GetBytes("IDGiven " + client.ID + "\n"));
 
                 Thread thread = new Thread(new ParameterizedThreadStart(ClientListen));
                 thread.Start(client);

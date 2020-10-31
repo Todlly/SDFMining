@@ -5,31 +5,68 @@ using System.Data;
 using System.Drawing;
 using System.Linq;
 using System.Net;
+using System.Security.Policy;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ClientTasker
 {
+    public struct Job
+    {
+        public int JobID;
+        public int[] JobData;
+
+        public Job(int jobID, int[] jobData)
+        {
+            JobID = jobID;
+            JobData = jobData;
+        }
+    }
+
     public partial class Form1 : Form
     {
         static IPEndPoint endpoint = new IPEndPoint(3232235523, 7000);
+        Random random = new Random();
+        private List<Job> completedJobs;
+        public List<Job> CompletedJobs
+        {
+            get
+            {
+                return completedJobs;
+            }
+            set
+            {
+                completedJobs = value;
+
+            }
+        }
 
         Recruiter recruiter;
+
+        public void ShowJobResult()
+        {
+            foreach (Job job in completedJobs)
+            {
+                lbl_JobResult.Text = "";
+                foreach (int num in job.JobData)
+                    lbl_JobResult.Text += num + " ";
+            }
+        }
 
         public Form1()
         {
             InitializeComponent();
+            recruiter = new Recruiter(endpoint, this);
+            CompletedJobs = new List<Job>();
             Timer timer = new Timer();
-            recruiter = new Recruiter(endpoint);
-            timer.Interval = 1000;
-          //    timer.Tick += Timer_Tick;
-          //   timer.Start();
+            timer.Tick += Timer_Tick;
+            timer.Start();
         }
 
         private void Timer_Tick(object sender, EventArgs e)
         {
-            recruiter.GiveJob(0, new int[] { 2, 3 });
+            ShowJobResult();
         }
 
         private void btn_Send_Click(object sender, EventArgs e)
@@ -38,13 +75,15 @@ namespace ClientTasker
             int[] intData = new int[stringData.Length];
             for (int i = 0; i < intData.Length; i++)
                 intData[i] = Convert.ToInt32(stringData[i]);
+            int ID = random.Next(0, 10000);
 
-            int[] result = recruiter.GiveJob(0, intData);
-            lbl_JobResult.Text = "";
-            foreach(int num in result)
-            {
-                lbl_JobResult.Text += num + " ";
-            }
+
+            recruiter.GiveJob(recruiter.ChooseWorker(), ID, intData);
+        }
+
+        private void Form1_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            recruiter.Disconnect();
         }
     }
 }
