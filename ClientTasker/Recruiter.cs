@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO.Pipes;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,8 +27,8 @@ namespace ClientTasker
     public class Recruiter
     {
         private Socket ServerSocket { get; }
-        private EndPoint Server { get; }
-        public List<int> WorkersIDs { get; set; } = new List<int>();
+        private EndPoint ServerEndpoint { get; }
+        public List<int> AvailableWorkersIDs { get; set; } = new List<int>();
         private Form1 Tasker { get; }
         private List<PendingJob> PendingJobs { get; set; } = new List<PendingJob>();
         private Random Random { get; set; } = new Random();
@@ -36,22 +38,19 @@ namespace ClientTasker
             Tasker = parent;
             ServerSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
 
-            Server = endpoint;
+            ServerEndpoint = endpoint;
 
             try
             {
-                ServerSocket.Connect("192.168.56.1", 7000);
-                byte[] answer = new byte[1024];
-                int ind = ServerSocket.Receive(answer);
+                ServerSocket.Connect(ServerEndpoint);
                 ThreadStart Listen = new ThreadStart(ListenServer);
                 Thread listening = new Thread(Listen);
                 listening.Start();
-                string ans = Encoding.ASCII.GetString(answer);
                 RefreshWorkersList();
             }
             catch (Exception e)
             {
-
+                Debug.WriteLine("Connection error");
             }
         }
 
@@ -66,6 +65,7 @@ namespace ClientTasker
 
         private void ExecuteCommand(string command)
         {
+            Console.WriteLine(command);
             string[] cmdParts = command.Split(' ');
 
             switch (cmdParts[0])
@@ -79,57 +79,68 @@ namespace ClientTasker
                         intData[i] = Convert.ToInt32(strData[i]);
                     ReceiveJobResult(new PendingJob(workerID, jobID), intData);
                     break;
+                case "Workers":
+                    List<int> availableIDs = new List<int>();
+                    foreach (string strID in cmdParts[1].Split('|'))
+                    {
+                        availableIDs.Add(Convert.ToInt32(strID));
+                        int availableID = Convert.ToInt32(strID);
+                        if (!AvailableWorkersIDs.Contains(availableID))
+                            AvailableWorkersIDs.Add(availableID);
+                    }
+                    foreach (int existingID in AvailableWorkersIDs)
+                    {
+                        if (!availableIDs.Contains(existingID))
+                            AvailableWorkersIDs.Remove(existingID);
+                    }
+                    break;
+                case "Disconnect":
+                    ServerSocket.Close();
+                    break;
             }
         }
 
         private void ListenServer()
         {
+            string stream = "";
             while (true)
             {
+                if (!ServerSocket.Connected)
+                    break;
+
                 byte[] buff = new byte[1024];
                 int ind = ServerSocket.Receive(buff);
-                string cmd = Encoding.ASCII.GetString(buff).Substring(0, ind);
-                ExecuteCommand(cmd);
+                string recievedMessage = Encoding.ASCII.GetString(buff).Substring(0, ind);
+                stream += recievedMessage;
+                int index = -1;
+                while((index = stream.IndexOf('\n')) != -1)
+                {
+                    string command = stream.Substring(0, index);
+                    stream = stream.Remove(0, index + 1);
+                    ExecuteCommand(command);
+                }
             }
         }
 
         public void RefreshWorkersList()
         {
-            ServerSocket.Send(Encoding.ASCII.GetBytes("get workers\r\n"));
-            byte[] answer = new byte[1024];
-            int len = ServerSocket.Receive(answer);
-            string[] stringsAnswer = Encoding.ASCII.GetString(answer).Substring(0, len).Split(' ');
-            if (stringsAnswer[0] == "Workers")
-            {
-                List<int> availableIDs = new List<int>();
-                foreach (string strID in stringsAnswer[1].Split('|'))
-                {
-                    availableIDs.Add(Convert.ToInt32(strID));
-                    int availableID = Convert.ToInt32(strID);
-                    if (!WorkersIDs.Contains(availableID))
-                        WorkersIDs.Add(availableID);
-                }
-                foreach (int existingID in WorkersIDs)
-                {
-                    if (!availableIDs.Contains(existingID))
-                        WorkersIDs.Remove(existingID);
-                }
-            }
+            ServerSocket.Send(Encoding.ASCII.GetBytes("get workers \r\n"));
         }
 
         public int ChooseWorker()
         {
-            return WorkersIDs[0];
+            return AvailableWorkersIDs[0];
         }
 
         public void Disconnect()
         {
-            ServerSocket.Disconnect(false);
+            ServerSocket.Send(Encoding.ASCII.GetBytes("Disconnect\r\n"));
         }
 
-        public void GiveJob(int workerID, int jobID, int[] data)
+        public void GiveJob(int jobID, int[] data)
         {
             string dataString = "";
+            int workerID = ChooseWorker();
             for (int i = 0; i < data.Length; i++)
             {
                 dataString += data[i];

@@ -29,7 +29,7 @@ namespace ClientWorker
             this.ID = jobID;
         }
 
-        
+
 
         public void DoJob()
         {
@@ -96,7 +96,7 @@ namespace ClientWorker
             switch (cmdParts[0])
             {
                 case "JobResult":
-                    
+
                     break;
                 case "msg":
                     string message = "";
@@ -114,6 +114,11 @@ namespace ClientWorker
                 case "IDGiven":
                     WorkID = Convert.ToInt32(cmdParts[1]);
                     break;
+                case "Disconnect":
+                  //  ServerSocket.Disconnect(false);
+                    ServerSocket.Close();
+                    Console.WriteLine("You were disconnected. Press Enter key to exit");
+                    break;
             }
         }
 
@@ -122,6 +127,9 @@ namespace ClientWorker
             string stream = "";
             while (true)
             {
+                if (!ServerSocket.Connected)
+                    break;
+
                 byte[] buff = new byte[1024];
                 int length = 0;
                 length = ServerSocket.Receive(buff);
@@ -154,8 +162,13 @@ namespace ClientWorker
             while (true)
             {
                 string cmd = Console.ReadLine();
-                ServerSocket.Send(Encoding.ASCII.GetBytes(cmd + "\r\n"));
+                if (ServerSocket.Connected)
+                    ServerSocket.Send(Encoding.ASCII.GetBytes(cmd + "\r\n"));
+                else 
+                    break;
             }
         }
+
+
     }
 }

@@ -34,6 +34,8 @@ namespace serv
             {
                 byte[] buff = new byte[1024];
                 int length = 0;
+                if (!client.Socket.Connected)
+                    return;
                 if ((length = client.Socket.Receive(buff)) == 0)
                 {
                     clientsList.Remove(client);
@@ -52,6 +54,14 @@ namespace serv
                     stream = stream.Remove(0, index + 2);
                 }
             }
+        }
+
+        private static void DisconnectAClient(Client client)
+        {
+            client.Socket.Send(Encoding.ASCII.GetBytes("Disconnect ack"));
+            client.Socket.Close();
+            clientsList.Remove(client);
+            Console.WriteLine("Disconnected ID " + client.ID);
         }
 
         static void Execute(string command, Client sender)
@@ -84,8 +94,12 @@ namespace serv
                             int[] availableWorkers = GetWorkers();
                             string msg = "Workers ";
                             foreach (int id in availableWorkers)
-                                msg += id + "|";
-                            sender.Socket.Send(Encoding.ASCII.GetBytes(msg));
+                            {
+                                msg += id;
+                                if (id != availableWorkers.Last())
+                                    msg += "|";
+                            }
+                            sender.Socket.Send(Encoding.ASCII.GetBytes(msg + "\n"));
                             break;
                     }
                     break;
@@ -119,6 +133,10 @@ namespace serv
                     for (int i = 2; i < parts.Length; i++)
                         mesge += parts[i] + ' ';
                     addreser.Socket.Send(Encoding.ASCII.GetBytes("job " + sender.ID + " " + mesge + "\n"));
+                    break;
+                case "Disconnect":
+                    sender.Socket.Send(Encoding.ASCII.GetBytes("Disconnect ack\n"));
+                    DisconnectAClient(sender);
                     break;
             }
         }

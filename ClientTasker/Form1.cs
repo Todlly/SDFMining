@@ -26,27 +26,15 @@ namespace ClientTasker
 
     public partial class Form1 : Form
     {
-        static IPEndPoint endpoint = new IPEndPoint(3232235523, 7000);
+        static IPEndPoint endpoint = new IPEndPoint(IPAddress.Parse("192.168.56.1"), 7000);
         Random random = new Random();
-        private List<Job> completedJobs;
-        public List<Job> CompletedJobs
-        {
-            get
-            {
-                return completedJobs;
-            }
-            set
-            {
-                completedJobs = value;
-
-            }
-        }
+        public List<Job> CompletedJobs { get; set; }
 
         Recruiter recruiter;
 
         public void ShowJobResult()
         {
-            foreach (Job job in completedJobs)
+            foreach (Job job in CompletedJobs)
             {
                 lbl_JobResult.Text = "";
                 foreach (int num in job.JobData)
@@ -78,7 +66,7 @@ namespace ClientTasker
             int ID = random.Next(0, 10000);
 
 
-            recruiter.GiveJob(recruiter.ChooseWorker(), ID, intData);
+            recruiter.GiveJob(ID, intData);
         }
 
         private void Form1_FormClosed(object sender, FormClosedEventArgs e)
