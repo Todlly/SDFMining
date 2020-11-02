@@ -54,6 +54,7 @@ namespace ClientWorker
         public static int WorkID { get; private set; }
         public const int MaxJobs = 4;
 
+        private Thread WorkingThread { get; set; }
         private static Random Random = new Random();
 
         public static void Working()
@@ -115,9 +116,13 @@ namespace ClientWorker
                     WorkID = Convert.ToInt32(cmdParts[1]);
                     break;
                 case "Disconnect":
-                  //  ServerSocket.Disconnect(false);
-                    ServerSocket.Close();
-                    Console.WriteLine("You were disconnected. Press Enter key to exit");
+                    ServerSocket.Disconnect(true);
+                    Console.WriteLine("You were disconnected. You can close the application safely now");
+                    break;
+                case "Connect":
+                    string address = cmdParts[1];
+                    int port = Convert.ToInt32(cmdParts[2]);
+                    TryConnect(new IPEndPoint(IPAddress.Parse(address), port));
                     break;
             }
         }
@@ -147,28 +152,38 @@ namespace ClientWorker
             }
         }
 
-        static void Main(string[] args)
+        public static void TryConnect(EndPoint endPoint)
         {
-            ServerSocket.Connect("192.168.56.1", 7000);
+            try
+            {
+                ServerSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+                ServerSocket.Connect(endPoint);
+            }catch(Exception e)
+            {
+                Console.WriteLine("Connection failed");
+                return;
+            }
+
             ThreadStart Work = new ThreadStart(Working);
-            Thread StartWorking = new Thread(Work);
-            StartWorking.Start();
+            Thread WorkingThread = new Thread(Work);
+            WorkingThread.Start();
 
             ThreadStart Listen = new ThreadStart(ListeningServer);
             Thread StartListening = new Thread(Listen);
             StartListening.Start();
             ServerSocket.Send(Encoding.ASCII.GetBytes("set type worker\r\n"));
+        }
 
+        static void Main(string[] args)
+        {
             while (true)
             {
                 string cmd = Console.ReadLine();
                 if (ServerSocket.Connected)
                     ServerSocket.Send(Encoding.ASCII.GetBytes(cmd + "\r\n"));
-                else 
-                    break;
+                else if (cmd.Split(' ')[0] == "Connect")
+                    EncodeCmd(cmd);
             }
         }
-
-
     }
 }

@@ -83,6 +83,10 @@ namespace serv
                                     clientsList[clientsList.IndexOf(sender)].ClientType = ClientType.Worker;
                                     sender.Socket.Send(Encoding.ASCII.GetBytes("Your Type Is Now " + clientsList[clientsList.IndexOf(sender)].ClientType + "\n"));
                                     break;
+                                case "tasker":
+                                    clientsList[clientsList.IndexOf(sender)].ClientType = ClientType.Tasker;
+                                    sender.Socket.Send(Encoding.ASCII.GetBytes("Your Type Is Now " + clientsList[clientsList.IndexOf(sender)].ClientType + "\n"));
+                                    break;
                             }
                             break;
                     }
@@ -137,7 +141,26 @@ namespace serv
                 case "Disconnect":
                     sender.Socket.Send(Encoding.ASCII.GetBytes("Disconnect ack\n"));
                     DisconnectAClient(sender);
+                    if (sender.ClientType == ClientType.Worker)
+                        SendOutWorkersList();
                     break;
+            }
+        }
+
+        private static void SendOutWorkersList()
+        {
+            foreach(Client client in clientsList.FindAll(cli => cli.ClientType == ClientType.Tasker))
+            {
+                int[] availableWorkers = GetWorkers();
+                string msg = "Workers ";
+                foreach (int id in availableWorkers)
+                {
+                    msg += id;
+                    if (id != availableWorkers.Last())
+                        msg += "|";
+                }
+                client.Socket.Send(Encoding.ASCII.GetBytes(msg + "\n"));
+                break;
             }
         }
 
@@ -167,6 +190,7 @@ namespace serv
 
                 Thread thread = new Thread(new ParameterizedThreadStart(ClientListen));
                 thread.Start(client);
+                SendOutWorkersList();
             }
         }
     }

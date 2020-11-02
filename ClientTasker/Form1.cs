@@ -45,7 +45,7 @@ namespace ClientTasker
         public Form1()
         {
             InitializeComponent();
-            recruiter = new Recruiter(endpoint, this);
+            recruiter = new Recruiter(this);
             CompletedJobs = new List<Job>();
             Timer timer = new Timer();
             timer.Tick += Timer_Tick;
@@ -71,7 +71,16 @@ namespace ClientTasker
 
         private void Form1_FormClosed(object sender, FormClosedEventArgs e)
         {
-            recruiter.Disconnect();
+            if (recruiter.ServerSocket.Connected)
+                recruiter.Disconnect();
+        }
+
+        private void btn_ServerConnect_Click(object sender, EventArgs e)
+        {
+            string ipAddress = txt_ServerAddress.Text;
+            int port = Convert.ToInt32(txt_ServerPort.Text);
+            endpoint = new IPEndPoint(IPAddress.Parse(ipAddress), port);
+            recruiter.TryConnect(endpoint);
         }
     }
 }
